@@ -1,0 +1,83 @@
+from pyspark.sql import SparkSession
+from pyspark.sql.functions import col, when, count
+
+spark = SparkSession.builder.appName('STUDENT_MANAGEMENT').getOrCreate()
+print("Spark Version:", spark.version)
+
+
+data = [
+    ("Priya", 21, "CSE", 8.7, 2020),
+    ("Hema", 22, "AI&DS", 9.2, 2021),
+    ("Kanika", 23, "IT", 7.9, 2019),
+    ("Dharshana", 22, "CSE", 8.5, 2020),
+    ("Kaviya", 21, "MECH", 7.2, 2021)
+]
+columns = ["Name", "Age", "Department", "GPA", "Year_of_Admission"]
+
+
+df = spark.createDataFrame(data, columns)
+df.show()
+df.printSchema()
+
+
+print("Total Rows:", df.count())
+print("Columns:", df.columns)
+df.describe().show()
+
+df.select("Department").distinct().show()
+
+df.filter(df["GPA"] >= 8.5).show()
+
+df.orderBy("Name").show()
+
+
+df.groupBy("Department").count().orderBy("count", ascending=False).show()
+
+
+df.groupBy("Department").avg("GPA").orderBy("Department").show()
+
+
+df = df.withColumn(
+    "Performance_Level",
+    when(col("GPA") >= 9, "Excellent")
+    .when(col("GPA") >= 8, "Good")
+    .otherwise("Average")
+)
+df.show()
+
+
+df.filter(df["Performance_Level"] == "Excellent").select("Name", "Performance_Level").show()
+
+
+df.select([count(when(col(c).isNull(), c)).alias(c) for c in df.columns]).show()
+
+
+df = df.withColumnRenamed("Name", "Student_Name")
+df.show()
+
+
+df.createOrReplaceTempView("students")
+spark.sql("""
+    SELECT Student_Name, Department, GPA
+    FROM students
+    ORDER BY GPA DESC
+    LIMIT 5
+""").show()
+
+
+spark.sql("""
+    SELECT Year_of_Admission, COUNT(*) AS total_students
+    FROM students
+    GROUP BY Year_of_Admission
+    ORDER BY Year_of_Admission
+""").show()
+
+
+
+df.write.csv("/content/output_students_csv", header=True)
+
+
+df.write.json("/content/output_students_json")
+
+
+df.write.parquet("/content/output_students_parquet")
